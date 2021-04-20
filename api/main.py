@@ -15,6 +15,7 @@ from tortoise.contrib.fastapi import register_tortoise
 TODO:
     1) Test using postman, swagger UI doesn't take in acces_token in header. For now, use Mod-Headers
     2) Modify RoomPydantic to include some data about host
+    3) Place constants in a .env file
 '''
 
 app = FastAPI()
@@ -97,6 +98,14 @@ async def get_current_user_util(token: str=Depends(oauth2_scheme)):
 async def get_current_user(user: schemas.UserPydantic=Depends(get_current_user_util)):
     return user
 
+@app.delete('/users/me/delete')
+async def delete_current_user(user: schemas.UserPydantic=Depends(get_current_user_util)):
+    obj = await User.get_user(user.id)
+    await obj.delete()
+    return{
+        "message" : "User deleted",
+    }
+
 
 '''
     End-points for rooms
@@ -128,3 +137,17 @@ async def get_room(room_code: str):
     obj = schemas.RoomPydantic(id=room.id, room_name=room.room_name, room_code = room.room_code, created_on=room.created_on,
                                 host=room.host.user_handle)
     return obj
+
+@app.delete('/room/{room_code}')
+async def delete_room(room_code: str, user: schemas.UserPydantic=Depends(get_current_user_util)):
+    room = await Room.get(room_code=room_code).prefetch_related("host").first()
+    user = await User.get_user(id=user.id)
+    if(not (room.host == user)):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Only host can delete the room",
+        )
+    await room.delete()
+    return{
+        "message" : f'Room with code {room_code} deleted'
+    }
