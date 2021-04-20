@@ -114,6 +114,14 @@ async def create_room(room: schemas.RoomCreatePydantic, user: schemas.UserPydant
                         created_on=created_room.created_on, host=jsonable_encoder(created_room.host.user_handle))
     return obj
 
+@app.get('/room/myrooms', response_model=List[schemas.RoomPydantic])
+async def get_user_rooms(user: schemas.UserPydantic=Depends(get_current_user_util)):
+    user = await User.get_user(user.id)
+    rooms_list = await Room.filter(host=user)
+    ret_list = [schemas.RoomPydantic(id=obj.id, room_name=obj.room_name, room_code=obj.room_code, created_on=obj.created_on,
+                host=user.user_handle) for obj in rooms_list]
+    return ret_list
+
 @app.get('/room/{room_code}', response_model=schemas.RoomPydantic)
 async def get_room(room_code: str):
     room = await Room.get(room_code=room_code).prefetch_related("host").first()
