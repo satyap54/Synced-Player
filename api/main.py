@@ -1,12 +1,13 @@
 import schemas
 from models import User, Room
 
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime, timedelta
 
 import jwt
 from fastapi import FastAPI, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, oauth2
+from fastapi.encoders import jsonable_encoder
 from passlib.hash import bcrypt
 from tortoise.contrib.fastapi import register_tortoise
 
@@ -79,7 +80,7 @@ async def create_user(user_data: schemas.UserCreatePydantic):
     obj = schemas.UserPydantic.from_orm(user_obj)
     return obj
 
-async def get_current_user(token: str=Depends(oauth2_scheme)):
+async def get_current_user_util(token: str=Depends(oauth2_scheme)):
     user = None
     try: 
         payload = jwt.decode(token, JWT_SECRET, algorithms=ALGORITHM)
@@ -93,7 +94,7 @@ async def get_current_user(token: str=Depends(oauth2_scheme)):
     return obj
 
 @app.get('/users/me', response_model=schemas.UserPydantic)
-async def get_current_user(user: schemas.UserPydantic=Depends(get_current_user)):
+async def get_current_user(user: schemas.UserPydantic=Depends(get_current_user_util)):
     return user
 
 
@@ -101,7 +102,7 @@ async def get_current_user(user: schemas.UserPydantic=Depends(get_current_user))
     End-points for rooms
 '''
 @app.post('/room/create', response_model=schemas.RoomPydantic)
-async def create_room(room: schemas.RoomCreatePydantic, user: schemas.UserPydantic=Depends(get_current_user)):
+async def create_room(room: schemas.RoomCreatePydantic, user: schemas.UserPydantic=Depends(get_current_user_util)):
     room_code = await Room.generate_room_code()
     created_room = await Room.create(
         host = await User.get_user(user.id),
@@ -109,11 +110,13 @@ async def create_room(room: schemas.RoomCreatePydantic, user: schemas.UserPydant
         room_code = room_code,
     )
     await created_room.save()
-    obj = schemas.RoomPydantic.from_orm(created_room)
+    obj = schemas.RoomPydantic(id=created_room.id, room_name=created_room.room_name, room_code = created_room.room_code,
+                        created_on=created_room.created_on, host=jsonable_encoder(created_room.host.user_handle))
     return obj
 
 @app.get('/room/{room_code}', response_model=schemas.RoomPydantic)
 async def get_room(room_code: str):
-    room = await Room.get(room_code=room_code)
-    obj = schemas.RoomPydantic.from_orm(room)
+    room = await Room.get(room_code=room_code).prefetch_related("host").first()
+    obj = schemas.RoomPydantic(id=room.id, room_name=room.room_name, room_code = room.room_code, created_on=room.created_on,
+                                host=room.host.user_handle)
     return obj

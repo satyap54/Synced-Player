@@ -48,6 +48,8 @@ class RoomPydantic(BaseModel):
     room_name: str
     room_code: str
     created_on: datetime.datetime
-
+    host: Optional[str]
+    
     class Config:
         orm_mode = True
+        validate_assignment = True

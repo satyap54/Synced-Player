@@ -46,3 +46,6 @@ class Room(models.Model):
             if len(room) == 0:
                 break
         return code
+    
+    def __str__(self) -> str:
+        return f"code = {self.room_code},  host={self.host}"
