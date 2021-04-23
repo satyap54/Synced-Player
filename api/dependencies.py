@@ -8,7 +8,6 @@ import jwt
 
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/token")
-router = APIRouter()
 
 
 ALGORITHM = ["HS256"]
@@ -36,22 +35,3 @@ async def get_current_user_util(token: str=Depends(oauth2_scheme)):
         )
     obj = schemas.UserPydantic.from_orm(user)
     return obj
-
-@router.post('/auth/token')
-async def generate_token(user_data: schemas.UserLoginPydantic):
-    user = await authenticate_user(user_data.user_handle, user_data.password)
-    if(not user):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid handle or password",
-        )
-    user_obj = schemas.UserPydantic.from_orm(user)
-    to_encode = user_obj.dict()
-    expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    #user_obj.exp = expire
-    to_encode.update({"exp" : expire})
-    token = jwt.encode(to_encode, JWT_SECRET)
-    return{
-        "access_token": token,
-        "token_type": "bearer",
-    }
